@@ -31,7 +31,7 @@ DEFAULT_TEMPLATES = {
 }
 
 # TODO: Add path to events file where webhook_server.py stores events
-# Hint: EVENTS_FILE = Path(__file__).parent / "github_events.json"
+EVENTS_FILE = Path(__file__).parent / "github_events.json"
 
 # Type mapping for PR templates
 TYPE_MAPPING = {
@@ -183,11 +183,15 @@ async def get_recent_actions_events(limit: int = 10) -> str:
     """
     # TODO: Implement this function
     # 1. Check if EVENTS_FILE exists
+    EVENTS_FILE = Path(__file__).parent / "github_events.json"
+    if EVENTS_FILE.exists():
+        return EVENTS_FILE.json.load("github_events.json", encoding="utf-8")[-10:]
+    else:
+        return []
     # 2. Read the JSON file
     # 3. Return the most recent events (up to limit)
     # 4. Return empty list if file doesn't exist
     
-    return json.dumps({"message": "TODO: Implement get_recent_actions_events"})
 
 
 @mcp.tool()
@@ -198,6 +202,35 @@ async def get_workflow_status(workflow_name: Optional[str] = None) -> str:
         workflow_name: Optional specific workflow name to filter by
     """
     # TODO: Implement this function
+    with open(EVENTS_FILE, "r", encoding="utf-8") as f:
+            github_event_json = json.load(f)
+            
+        workflow_run_events = []
+        for event in github_event_json:
+            if "workflow_run" in event:
+                workflow_run_events.append(event)
+        workflow_run_events_with_name = []
+        if workflow_name:
+            for event in workflow_run_events:
+                    if event["workflow_run"]["name"] == workflow_name:
+                        workflow_run_events_with_name.append(event)
+            workflow_run_events = workflow_run_events_with_name
+        workflow_statuses = {}
+        for event in workflow_run_events:
+            workflow_name = event["workflow_run"]["name"]
+            if workflow_name not in workflow_statuses:
+                workflow_statuses[workflow_name] = {
+                    "status": event["workflow_run"]["status"],
+                    "timestamp": datetime.fromisoformat(event["timestamp"].replace('Z', '+00:00'))
+                }
+
+        # doesnt return the latest status
+    return json.dumps({
+            "workflows": workflow_statuses,
+            "total_workflows": len(workflow_statuses),
+            "filtered_by": workflow_name
+        }, indent=2)
+        
     # 1. Read events from EVENTS_FILE
     # 2. Filter events for workflow_run events
     # 3. If workflow_name provided, filter by that name
